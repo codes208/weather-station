@@ -8,7 +8,7 @@ A hobby weather station built in phases on an STM32 Nucleo-F446RE, written in C 
 
 ![Breadboard setup](images/breadboard.jpg)
 
-![Serial output from thermistor\_adc](images/thermistor\_output.png)
+![Serial output from thermistor_adc](images/thermistor_output.png)
 
 
 
