@@ -41,15 +41,10 @@ A hobby weather station built in phases on an STM32 Nucleo-F446RE, written in C 
 
 
 | Project | What it does | Concepts |
-
 |---|---|---|
-
 | blinky | Toggles the onboard LED (PA5) | GPIO output, HAL_Delay |
-
 | uart_hello | Prints messages and a counter to a PC over the ST-LINK virtual COM port | USART2, snprintf, HAL_UART_Transmit |
-
 | oled_hello | Displays centered text on the SSD1306 OLED | I2C1, pin remapping, third-party driver integration, framebuffers |
-
 | thermistor_adc | Reads a thermistor on the ADC and prints temperature in °F once a second | 12-bit ADC polling, beta equation, float math on the M4F FPU, HAL status checking |
 
 
