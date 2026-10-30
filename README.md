@@ -32,7 +32,7 @@ A hobby weather station built in phases on an STM32 Nucleo-F446RE, written in C 
 
 - STM32CubeIDE 2.2.0 for building, flashing, and debugging
 
-- STM32Cube FW\_F4 V1.28.3
+- STM32Cube FW_F4 V1.28.3
 
 
 
@@ -44,29 +44,29 @@ A hobby weather station built in phases on an STM32 Nucleo-F446RE, written in C 
 
 |---|---|---|
 
-| blinky | Toggles the onboard LED (PA5) | GPIO output, HAL\_Delay |
+| blinky | Toggles the onboard LED (PA5) | GPIO output, HAL_Delay |
 
-| uart\_hello | Prints messages and a counter to a PC over the ST-LINK virtual COM port | USART2, snprintf, HAL\_UART\_Transmit |
+| uart_hello | Prints messages and a counter to a PC over the ST-LINK virtual COM port | USART2, snprintf, HAL_UART_Transmit |
 
-| oled\_hello | Displays centered text on the SSD1306 OLED | I2C1, pin remapping, third-party driver integration, framebuffers |
+| oled_hello | Displays centered text on the SSD1306 OLED | I2C1, pin remapping, third-party driver integration, framebuffers |
 
-| thermistor\_adc | Reads a thermistor on the ADC and prints temperature in °F once a second | 12-bit ADC polling, beta equation, float math on the M4F FPU, HAL status checking |
+| thermistor_adc | Reads a thermistor on the ADC and prints temperature in °F once a second | 12-bit ADC polling, beta equation, float math on the M4F FPU, HAL status checking |
 
 
 
 ## Roadmap
 
-1. \*\*Board basics\*\* (in progress): GPIO, UART, ADC, timer interrupts, button input, register-level blink
+1. **Board basics** (in progress): GPIO, UART, ADC, timer interrupts, button input, register-level blink
 
-2. \*\*Indoor station:\*\* BME280 and OLED on I2C, button-cycled screens, dew point
+2. **Indoor station:** BME280 and OLED on I2C, button-cycled screens, dew point
 
-3. \*\*Data:\*\* stream readings to a Python script, microSD logging over SPI
+3. **Data:** stream readings to a Python script, microSD logging over SPI
 
-4. \*\*Wireless:\*\* ESP32-S3 bridge over UART to a web dashboard
+4. **Wireless:** ESP32-S3 bridge over UART to a web dashboard
 
-5. \*\*Outdoors:\*\* wind and rain sensors, radiation shield enclosure, solar and LiFePO4 power, sleep modes
+5. **Outdoors:** wind and rain sensors, radiation shield enclosure, solar and LiFePO4 power, sleep modes
 
-6. \*\*Custom PCB:\*\* KiCad sensor carrier board, then a full STM32L board
+6. **Custom PCB:** KiCad sensor carrier board, then a full STM32L board
 
 
 
@@ -78,5 +78,5 @@ Each folder is a standalone STM32CubeIDE project. Import it with File > Import >
 
 ## Credits
 
-oled\_hello uses the \[afiskon/stm32-ssd1306](https://github.com/afiskon/stm32-ssd1306) driver library.
+oled_hello uses the [afiskon/stm32-ssd1306](https://github.com/afiskon/stm32-ssd1306) driver library.
 
