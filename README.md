@@ -36,6 +36,18 @@ A hobby weather station built in phases on an STM32 Nucleo-F446RE, written in C 
 
 
 
+## Coding conventions
+
+- Functions: camelCase (`readThermistorRaw`)
+
+- Variables: snake_case (`sample_flag`)
+
+- Constants and macros: ALL_CAPS (`ADC_MIN_VALID`)
+
+- My code goes inside CubeMX `USER CODE BEGIN/END` blocks so regeneration doesn't erase it
+
+
+
 ## Projects
 
 

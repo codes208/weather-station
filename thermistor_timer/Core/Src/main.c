@@ -14,6 +14,9 @@
   * If no LICENSE file comes with this software, it is provided AS-IS.
   *
   ******************************************************************************
+  * Functions: CamelCase
+  * Variables: snake_case
+  * constants and macros: ALL_CAPS
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
@@ -47,6 +50,7 @@
 #define UART_TIMEOUT_MS 100
 #define ADC_MIN_VALID 50
 #define ADC_MAX_VALID 4045
+#define ADC_MAX_COUNT 4095.0f
 
 /* USER CODE END PM */
 
@@ -68,7 +72,8 @@ static void MX_USART2_UART_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
-
+HAL_StatusTypeDef readThermistorRaw(ADC_HandleTypeDef *hadc, uint32_t *raw_count);
+float adcToTempF(uint32_t adc);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -126,36 +131,25 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 	  if(sample_flag == 1){
+		  uint32_t adc = 0;
+		  float temp_f = 0.0f;
 		  sample_flag = 0;
-		  status = HAL_ADC_Start(&hadc1);
-		  if(status == HAL_OK){
-			  status = HAL_ADC_PollForConversion(&hadc1, ADC_TIMEOUT_MS);
-			  if(status == HAL_OK){
-				  uint32_t adc = HAL_ADC_GetValue(&hadc1);
-				  if(adc < ADC_MIN_VALID){
-					  snprintf(buffer, sizeof(buffer), "Thermistor disconnected\r\n");
-					  HAL_UART_Transmit(&huart2, (const uint8_t *)buffer, strlen(buffer), UART_TIMEOUT_MS);
-				  }else if(adc > ADC_MAX_VALID){
-					  snprintf(buffer, sizeof(buffer), "Thermistor shorted\r\n");
-					  HAL_UART_Transmit(&huart2, (const uint8_t *)buffer, strlen(buffer), UART_TIMEOUT_MS);
-				  }else{
-					  float res_temp = R_FIXED * (4095.0f / adc - 1.0f);
-					  float invert_t = 1.0f / T_0 + ((1.0f / BETA) * logf(res_temp / R_0));
-					  float temp_k = 1.0f / invert_t;
-					  float temp_c = temp_k - KELVIN_OFFSET;
-					  float temp_f = temp_c * (9.0f / 5.0f) + 32.0f;
-
-					  snprintf(buffer, sizeof(buffer), "Temp: %.2f F\r\n", temp_f);
-					  HAL_UART_Transmit(&huart2, (const uint8_t *)buffer, strlen(buffer), UART_TIMEOUT_MS);
-				  }
-
-			  }else{
-				  snprintf(buffer, sizeof(buffer), "Poll error: %d\r\n", status);
-				  HAL_UART_Transmit(&huart2, (const uint8_t *)buffer, strlen(buffer), UART_TIMEOUT_MS);
-			  }
-
-		  }else{
-			  snprintf(buffer, sizeof(buffer), "Start error: %d\r\n", status);
+		  status = readThermistorRaw(&hadc1, &adc);
+		  if(status != HAL_OK){
+			  snprintf(buffer, sizeof(buffer), "Read thermistor error: %d\r\n", status);
+			  HAL_UART_Transmit(&huart2, (const uint8_t *)buffer, strlen(buffer), UART_TIMEOUT_MS);
+		  }
+		  else if(adc < ADC_MIN_VALID){
+			  snprintf(buffer, sizeof(buffer), "Thermistor disconnected\r\n");
+			  HAL_UART_Transmit(&huart2, (const uint8_t *)buffer, strlen(buffer), UART_TIMEOUT_MS);
+		  }
+		  else if(adc > ADC_MAX_VALID){
+			  snprintf(buffer, sizeof(buffer), "Thermistor shorted\r\n");
+			  HAL_UART_Transmit(&huart2, (const uint8_t *)buffer, strlen(buffer), UART_TIMEOUT_MS);
+		  }
+		  else{
+			  temp_f = adcToTempF(adc);
+			  snprintf(buffer, sizeof(buffer), "Temp: %.2f F\r\n", temp_f);
 			  HAL_UART_Transmit(&huart2, (const uint8_t *)buffer, strlen(buffer), UART_TIMEOUT_MS);
 		  }
 	  }
@@ -386,6 +380,31 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 		sample_flag = 1;
 	}
 }
+
+HAL_StatusTypeDef readThermistorRaw(ADC_HandleTypeDef *hadc, uint32_t *raw_count){
+	HAL_StatusTypeDef status = HAL_ADC_Start(hadc);
+	if(status != HAL_OK){
+		return status;
+	}
+	status = HAL_ADC_PollForConversion(hadc, ADC_TIMEOUT_MS);
+	if(status != HAL_OK){
+		return status;
+	}
+	*raw_count = HAL_ADC_GetValue(hadc);
+	return HAL_OK;
+}
+
+/*Expects a valid reading between ADC_MIN_VALID and ADC_MAX_VALID*/
+float adcToTempF(uint32_t adc){
+	float res_temp = R_FIXED * (ADC_MAX_COUNT / adc - 1.0f);
+	float invert_t = 1.0f / T_0 + ((1.0f / BETA) * logf(res_temp / R_0));
+	float temp_k = 1.0f / invert_t;
+	float temp_c = temp_k - KELVIN_OFFSET;
+	float temp_f = temp_c * (9.0f / 5.0f) + 32.0f;
+	return temp_f;
+}
+
+
 
 /* USER CODE END 4 */
 
