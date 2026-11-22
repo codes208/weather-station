@@ -404,8 +404,6 @@ float adcToTempF(uint32_t adc){
 	return temp_f;
 }
 
-
-
 /* USER CODE END 4 */
 
 /**

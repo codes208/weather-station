@@ -32,6 +32,7 @@ A hobby weather station built in phases on an STM32 Nucleo-F446RE, written in C 
 | oled_hello | Displays centered text on the SSD1306 OLED | I2C1, pin remapping, third-party driver integration, framebuffers |
 | thermistor_adc | Reads a thermistor on the ADC and prints temperature in °F once a second | 12-bit ADC polling, beta equation, float math on the M4F FPU, HAL status checking |
 | thermistor_timer | Prints the temperature in °F once a second, timed by a TIM3 interrupt instead of `HAL_Delay`; reports a disconnected or shorted thermistor | Timer interrupts (TIM3, PSC/ARR), HAL callbacks, `volatile` flags, fault detection, refactoring into functions |
+| thermistor_avg | Samples the thermistor 10 times a second and prints the average in °F once a second; skips bad samples and prints "Thermistor fault!" if none are valid | 10 Hz sampling, averaging raw ADC counts, float division, separate tick and good-sample counters, noise reduction (jitter cut from about ±0.4 °F to ±0.1 °F) |
 
 ## Roadmap
 1. **Board basics** (in progress): GPIO, UART, ADC, timer interrupts, button input, register-level blink
