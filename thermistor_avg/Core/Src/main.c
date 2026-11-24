@@ -28,7 +28,11 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+typedef enum{
+	THERM_OK = 0,
+	THERM_DISCONNECTED = 1,
+	THERM_SHORTED = 2,
+}ThermStatus;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -73,6 +77,8 @@ static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 HAL_StatusTypeDef readThermistorRaw(ADC_HandleTypeDef *hadc, uint32_t *raw_count);
 float adcToTempF(float adc);
+HAL_StatusTypeDef uartPrint(UART_HandleTypeDef *huart, const char *msg);
+ThermStatus getThermStatus(uint32_t raw_count);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -115,13 +121,17 @@ int main(void)
   /* USER CODE BEGIN 2 */
   char buffer[32];
   uint32_t sum_adc = 0;
-  uint8_t good_reading_counter = 0;
+  uint8_t read_ok_counter = 0;
+  uint8_t disconnected_counter = 0;
+  uint8_t shorted_counter = 0;
+  uint8_t read_error_counter = 0;
   uint8_t tick_counter = 0;
 
   HAL_StatusTypeDef status = HAL_TIM_Base_Start_IT(&htim3);
   if(status != HAL_OK){
-	  snprintf(buffer, sizeof(buffer), "Timer Start Error: %d\r\n", status);
-	  HAL_UART_Transmit(&huart2, (const uint8_t *)buffer, strlen(buffer), HAL_MAX_DELAY);
+	  snprintf(buffer, sizeof(buffer), "Timer start error: %d\r\n", status);
+	  (void)uartPrint(&huart2, buffer);
+	  Error_Handler();
   }
   /* USER CODE END 2 */
 
@@ -129,34 +139,55 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    /* USER CODE END WHILE */
+	  /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
-	if(sample_flag == 1){
-		sample_flag = 0;
-		tick_counter++;
-		uint32_t adc = 0;
-	  	status = readThermistorRaw(&hadc1, &adc);
-	  	if(status == HAL_OK && adc >= ADC_MIN_VALID && adc <= ADC_MAX_VALID){
-	  		good_reading_counter++;
-	  		sum_adc += adc;
-	  	}
-	  	if(tick_counter == SAMPLES_PER_AVE){
-	  		tick_counter = 0;
-	  		if(good_reading_counter == 0){
-	  			snprintf(buffer, sizeof(buffer), "Thermistor fault!\r\n");
-	  			HAL_UART_Transmit(&huart2, (const uint8_t *)buffer, strlen(buffer), UART_TIMEOUT_MS);
-	  		}
-	  		else{
-		  		float ave_adc = (float)sum_adc / good_reading_counter;
-		  		float temp_f = adcToTempF(ave_adc);
-		  		snprintf(buffer, sizeof(buffer), "Temp: %.2f F\r\n", temp_f);
-		  		HAL_UART_Transmit(&huart2, (const uint8_t *)buffer, strlen(buffer), UART_TIMEOUT_MS);
-	  		}
-	  		sum_adc = 0;
-	  		good_reading_counter = 0;
-	  	}
-	}
+	  /* USER CODE BEGIN 3 */
+	  if(sample_flag == 1){
+		  sample_flag = 0;
+		  tick_counter++;
+		  uint32_t adc = 0;
+		  status = readThermistorRaw(&hadc1, &adc);
+		  if(status != HAL_OK){
+			  read_error_counter++;
+		  }
+		  else{
+			  switch(getThermStatus(adc)){
+			  	  case THERM_OK:
+			  		  read_ok_counter++;
+			  		  sum_adc += adc;
+			  		  break;
+			  	  case THERM_DISCONNECTED:
+			  		  disconnected_counter++;
+			  		  break;
+			  	  case THERM_SHORTED:
+			  		  shorted_counter++;
+			  		  break;
+			  }
+		  }
+		  if(tick_counter == SAMPLES_PER_AVE){
+			  if(read_ok_counter > (disconnected_counter + shorted_counter + read_error_counter)){
+				  float ave_adc = (float)sum_adc / read_ok_counter;
+				  float temp_f = adcToTempF(ave_adc);
+				  snprintf(buffer, sizeof(buffer), "Temp: %.2f F\r\n", temp_f);
+				  (void)uartPrint(&huart2, buffer);
+			  }
+			  else if((read_error_counter >= disconnected_counter) && (read_error_counter >= shorted_counter)){
+				  (void)uartPrint(&huart2, "Read error fault!\r\n");
+			  }
+			  else if((shorted_counter >= read_error_counter) && (shorted_counter >= disconnected_counter)){
+				  (void)uartPrint(&huart2, "Thermistor shorted!\r\n");
+			  }
+			  else{
+				  (void)uartPrint(&huart2, "Thermistor disconnected!\r\n");
+			  }
+			  tick_counter = 0;
+			  sum_adc = 0;
+			  read_ok_counter = 0;
+			  read_error_counter = 0;
+			  disconnected_counter = 0;
+			  shorted_counter = 0;
+		  }
+	  }
   }
   /* USER CODE END 3 */
 }
@@ -395,7 +426,7 @@ HAL_StatusTypeDef readThermistorRaw(ADC_HandleTypeDef *hadc, uint32_t *raw_count
 		return status;
 	}
 	*raw_count = HAL_ADC_GetValue(hadc);
-	return HAL_OK;
+	return status;
 }
 
 /*Expects a valid reading between ADC_MIN_VALID and ADC_MAX_VALID*/
@@ -406,6 +437,23 @@ float adcToTempF(float adc){
 	float temp_c = temp_k - KELVIN_OFFSET;
 	float temp_f = temp_c * (9.0f / 5.0f) + 32.0f;
 	return temp_f;
+}
+
+HAL_StatusTypeDef uartPrint(UART_HandleTypeDef *huart, const char *msg){
+	HAL_StatusTypeDef status = HAL_UART_Transmit(huart, (const uint8_t *)msg, strlen(msg), UART_TIMEOUT_MS);
+	return status;
+}
+
+ThermStatus getThermStatus(uint32_t raw_count){
+	if(raw_count < ADC_MIN_VALID){
+		return THERM_DISCONNECTED;
+	}
+	else if(raw_count > ADC_MAX_VALID){
+		return THERM_SHORTED;
+	}
+	else{
+		return THERM_OK;
+	}
 }
 /* USER CODE END 4 */
 

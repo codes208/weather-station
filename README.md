@@ -22,6 +22,8 @@ A hobby weather station built in phases on an STM32 Nucleo-F446RE, written in C 
 - Functions: camelCase (`readThermistorRaw`)
 - Variables: snake_case (`sample_flag`)
 - Constants and macros: ALL_CAPS (`ADC_MIN_VALID`)
+- Types: PascalCase (`ThermStatus`)
+- Enum values: ALL_CAPS with a prefix (`THERM_OK`)
 - My code goes inside CubeMX `USER CODE BEGIN/END` blocks so regeneration doesn't erase it
 
 ## Projects
@@ -32,7 +34,7 @@ A hobby weather station built in phases on an STM32 Nucleo-F446RE, written in C 
 | oled_hello | Displays centered text on the SSD1306 OLED | I2C1, pin remapping, third-party driver integration, framebuffers |
 | thermistor_adc | Reads a thermistor on the ADC and prints temperature in °F once a second | 12-bit ADC polling, beta equation, float math on the M4F FPU, HAL status checking |
 | thermistor_timer | Prints the temperature in °F once a second, timed by a TIM3 interrupt instead of `HAL_Delay`; reports a disconnected or shorted thermistor | Timer interrupts (TIM3, PSC/ARR), HAL callbacks, `volatile` flags, fault detection, refactoring into functions |
-| thermistor_avg | Samples the thermistor 10 times a second and prints the average in °F once a second; skips bad samples and prints "Thermistor fault!" if none are valid | 10 Hz sampling, averaging raw ADC counts, float division, separate tick and good-sample counters, noise reduction (jitter cut from about ±0.4 °F to ±0.1 °F) |
+| thermistor_avg | Samples the thermistor 10 times a second and prints the average in °F once a second; classifies every sample and, if fewer than 6 of 10 are good, reports the most common fault (disconnected, shorted, or ADC read error) | 10 Hz sampling, averaging raw ADC counts, float division, enums and `switch`, majority-vote fault reporting, fault injection testing, noise reduction (jitter cut from about ±0.4 °F to ±0.1 °F) |
 
 ## Roadmap
 1. **Board basics** (in progress): GPIO, UART, ADC, timer interrupts, button input, register-level blink
