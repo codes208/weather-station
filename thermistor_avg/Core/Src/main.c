@@ -33,6 +33,21 @@ typedef enum{
 	THERM_DISCONNECTED = 1,
 	THERM_SHORTED = 2,
 }ThermStatus;
+
+typedef enum{
+	THERM_REPORT_OK = 0,
+	THERM_REPORT_READ_ERROR = 1,
+	THERM_REPORT_SHORTED = 2,
+	THERM_REPORT_DISCONNECTED = 3
+}ThermTallyReport;
+
+typedef struct{
+	uint32_t ok_adc_sum;
+	uint8_t read_ok;
+	uint8_t disconnected;
+	uint8_t shorted;
+	uint8_t read_error;
+}SampleTally;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -79,6 +94,12 @@ HAL_StatusTypeDef readThermistorRaw(ADC_HandleTypeDef *hadc, uint32_t *raw_count
 float adcToTempF(float adc);
 HAL_StatusTypeDef uartPrint(UART_HandleTypeDef *huart, const char *msg);
 ThermStatus getThermStatus(uint32_t raw_count);
+uint32_t getTallyTotal(const SampleTally *tally);
+void recordSample(SampleTally *tally, HAL_StatusTypeDef status, uint32_t raw_count);
+void resetTally(SampleTally *tally);
+ThermTallyReport getDecision(const SampleTally *tally);
+HAL_StatusTypeDef printReport(UART_HandleTypeDef *huart, ThermTallyReport decision, float temp_f);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -120,12 +141,8 @@ int main(void)
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
   char buffer[32];
-  uint32_t sum_adc = 0;
-  uint8_t read_ok_counter = 0;
-  uint8_t disconnected_counter = 0;
-  uint8_t shorted_counter = 0;
-  uint8_t read_error_counter = 0;
-  uint8_t tick_counter = 0;
+  SampleTally tally = {0};
+  float temp_f = 0.0f;
 
   HAL_StatusTypeDef status = HAL_TIM_Base_Start_IT(&htim3);
   if(status != HAL_OK){
@@ -144,48 +161,17 @@ int main(void)
 	  /* USER CODE BEGIN 3 */
 	  if(sample_flag == 1){
 		  sample_flag = 0;
-		  tick_counter++;
 		  uint32_t adc = 0;
 		  status = readThermistorRaw(&hadc1, &adc);
-		  if(status != HAL_OK){
-			  read_error_counter++;
-		  }
-		  else{
-			  switch(getThermStatus(adc)){
-			  	  case THERM_OK:
-			  		  read_ok_counter++;
-			  		  sum_adc += adc;
-			  		  break;
-			  	  case THERM_DISCONNECTED:
-			  		  disconnected_counter++;
-			  		  break;
-			  	  case THERM_SHORTED:
-			  		  shorted_counter++;
-			  		  break;
+		  recordSample(&tally, status, adc);
+		  if(getTallyTotal(&tally) == SAMPLES_PER_AVE){
+			  ThermTallyReport decision = getDecision(&tally);
+			  if(decision == THERM_REPORT_OK){
+				  float ave_adc = (float)(tally.ok_adc_sum) / tally.read_ok;
+				  temp_f = adcToTempF(ave_adc);
 			  }
-		  }
-		  if(tick_counter == SAMPLES_PER_AVE){
-			  if(read_ok_counter > (disconnected_counter + shorted_counter + read_error_counter)){
-				  float ave_adc = (float)sum_adc / read_ok_counter;
-				  float temp_f = adcToTempF(ave_adc);
-				  snprintf(buffer, sizeof(buffer), "Temp: %.2f F\r\n", temp_f);
-				  (void)uartPrint(&huart2, buffer);
-			  }
-			  else if((read_error_counter >= disconnected_counter) && (read_error_counter >= shorted_counter)){
-				  (void)uartPrint(&huart2, "Read error fault!\r\n");
-			  }
-			  else if((shorted_counter >= read_error_counter) && (shorted_counter >= disconnected_counter)){
-				  (void)uartPrint(&huart2, "Thermistor shorted!\r\n");
-			  }
-			  else{
-				  (void)uartPrint(&huart2, "Thermistor disconnected!\r\n");
-			  }
-			  tick_counter = 0;
-			  sum_adc = 0;
-			  read_ok_counter = 0;
-			  read_error_counter = 0;
-			  disconnected_counter = 0;
-			  shorted_counter = 0;
+			  (void)printReport(&huart2, decision, temp_f);
+			  resetTally(&tally);
 		  }
 	  }
   }
@@ -454,6 +440,67 @@ ThermStatus getThermStatus(uint32_t raw_count){
 	else{
 		return THERM_OK;
 	}
+}
+
+void resetTally(SampleTally *tally){
+	*tally = (SampleTally){0};
+}
+
+uint32_t getTallyTotal(const SampleTally *tally){
+	uint32_t total = tally->read_ok + tally->disconnected + tally->shorted + tally->read_error;
+	return total;
+}
+
+void recordSample(SampleTally *tally, HAL_StatusTypeDef status, uint32_t raw_count){
+	if(status != HAL_OK){
+		tally->read_error++;
+	}
+	else{
+		switch(getThermStatus(raw_count)){
+			case THERM_OK:
+				tally->read_ok++;
+				tally->ok_adc_sum += raw_count;
+				break;
+			case THERM_DISCONNECTED:
+				tally->disconnected++;
+				break;
+			case THERM_SHORTED:
+				tally->shorted++;
+				break;
+		}
+	}
+}
+
+ThermTallyReport getDecision(const SampleTally *tally){
+	if(tally->read_ok > (getTallyTotal(tally) - tally->read_ok)){
+		return THERM_REPORT_OK;
+	}
+	else if((tally->read_error >= tally->disconnected) && (tally->read_error >= tally->shorted)){
+		return THERM_REPORT_READ_ERROR;
+	}
+	else if((tally->shorted >= tally->read_error) && (tally->shorted >= tally->disconnected)){
+		return THERM_REPORT_SHORTED;
+	}
+	else{
+		return THERM_REPORT_DISCONNECTED;
+	}
+}
+
+HAL_StatusTypeDef printReport(UART_HandleTypeDef *huart, ThermTallyReport decision, float temp_f){
+	switch(decision){
+		case THERM_REPORT_OK: {
+			char buffer[32];
+			snprintf(buffer, sizeof(buffer), "Temp: %.2f F\r\n", temp_f);
+			return uartPrint(huart, buffer);
+		}
+		case THERM_REPORT_READ_ERROR:
+			return uartPrint(huart, "Read error fault!\r\n");
+		case THERM_REPORT_SHORTED:
+			return uartPrint(huart, "Thermistor shorted!\r\n");
+		case THERM_REPORT_DISCONNECTED:
+			return uartPrint(huart, "Thermistor disconnected!\r\n");
+	}
+	return HAL_ERROR;
 }
 /* USER CODE END 4 */
 
